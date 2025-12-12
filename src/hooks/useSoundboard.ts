@@ -5,7 +5,8 @@ export interface SoundPad {
   key: string;
   name: string;
   color: number;
-  soundUrl?: string;
+  audioData?: string; // Base64 encoded audio data
+  audioFileName?: string;
   volume: number;
 }
 
@@ -117,6 +118,7 @@ export function useSoundboard() {
   const [activePads, setActivePads] = useState<Set<string>>(new Set());
   const [editingPad, setEditingPad] = useState<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const audioBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
 
   const getAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
@@ -125,39 +127,84 @@ export function useSoundboard() {
     return audioContextRef.current;
   }, []);
 
+  // Decode and cache audio buffers
+  const getAudioBuffer = useCallback(async (padId: string, audioData: string): Promise<AudioBuffer | null> => {
+    if (audioBuffersRef.current.has(padId)) {
+      return audioBuffersRef.current.get(padId)!;
+    }
+    
+    try {
+      const audioContext = getAudioContext();
+      const base64Data = audioData.split(',')[1] || audioData;
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const buffer = await audioContext.decodeAudioData(bytes.buffer);
+      audioBuffersRef.current.set(padId, buffer);
+      return buffer;
+    } catch (error) {
+      console.error('Failed to decode audio:', error);
+      return null;
+    }
+  }, [getAudioContext]);
+
+  const playCustomAudio = useCallback(async (padId: string, audioData: string, volume: number) => {
+    const audioContext = getAudioContext();
+    const buffer = await getAudioBuffer(padId, audioData);
+    
+    if (buffer) {
+      const source = audioContext.createBufferSource();
+      const gainNode = audioContext.createGain();
+      
+      source.buffer = buffer;
+      gainNode.gain.value = volume;
+      
+      source.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      source.start(0);
+    }
+  }, [getAudioContext, getAudioBuffer]);
+
   const playSound = useCallback((padId: string) => {
     const pad = pads.find(p => p.id === padId);
     if (!pad) return;
 
-    const audioContext = getAudioContext();
-    
-    // Play different sounds based on pad name
-    switch (pad.name.toLowerCase()) {
-      case 'kick':
-        createKick(audioContext);
-        break;
-      case 'snare':
-      case 'clap':
-        createSnare(audioContext);
-        break;
-      case 'hi-hat':
-      case 'crash':
-        createHiHat(audioContext);
-        break;
-      case 'tom':
-        createOscillatorSound('sine', 100, 0.3, audioContext);
-        break;
-      case 'bass':
-        createOscillatorSound('sawtooth', 55, 0.4, audioContext);
-        break;
-      case 'synth':
-        createOscillatorSound('square', 440, 0.3, audioContext);
-        break;
-      case 'fx':
-        createOscillatorSound('triangle', 880, 0.5, audioContext);
-        break;
-      default:
-        createOscillatorSound('sine', 440, 0.2, audioContext);
+    // Play custom audio if available
+    if (pad.audioData) {
+      playCustomAudio(padId, pad.audioData, pad.volume);
+    } else {
+      const audioContext = getAudioContext();
+      
+      // Play different sounds based on pad name
+      switch (pad.name.toLowerCase()) {
+        case 'kick':
+          createKick(audioContext);
+          break;
+        case 'snare':
+        case 'clap':
+          createSnare(audioContext);
+          break;
+        case 'hi-hat':
+        case 'crash':
+          createHiHat(audioContext);
+          break;
+        case 'tom':
+          createOscillatorSound('sine', 100, 0.3, audioContext);
+          break;
+        case 'bass':
+          createOscillatorSound('sawtooth', 55, 0.4, audioContext);
+          break;
+        case 'synth':
+          createOscillatorSound('square', 440, 0.3, audioContext);
+          break;
+        case 'fx':
+          createOscillatorSound('triangle', 880, 0.5, audioContext);
+          break;
+        default:
+          createOscillatorSound('sine', 440, 0.2, audioContext);
+      }
     }
 
     setActivePads(prev => new Set([...prev, padId]));
@@ -168,9 +215,14 @@ export function useSoundboard() {
         return next;
       });
     }, 150);
-  }, [pads, getAudioContext]);
+  }, [pads, getAudioContext, playCustomAudio]);
 
   const updatePad = useCallback((padId: string, updates: Partial<SoundPad>) => {
+    // Clear cached audio buffer if audio data changes
+    if ('audioData' in updates) {
+      audioBuffersRef.current.delete(padId);
+    }
+    
     setPads(prev => {
       const newPads = prev.map(p => p.id === padId ? { ...p, ...updates } : p);
       localStorage.setItem('soundboard-pads', JSON.stringify(newPads));
