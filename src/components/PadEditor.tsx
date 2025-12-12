@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { X } from 'lucide-react';
+import { X, Upload, Trash2, Music } from 'lucide-react';
 import type { SoundPad } from '@/hooks/useSoundboard';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface PadEditorProps {
   pad: SoundPad;
@@ -32,6 +33,8 @@ export function PadEditor({ pad, onUpdate, onClose, onKeyChange }: PadEditorProp
   const [name, setName] = useState(pad.name);
   const [key, setKey] = useState(pad.key);
   const [isListeningForKey, setIsListeningForKey] = useState(false);
+  const [audioFileName, setAudioFileName] = useState(pad.audioFileName || '');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isListeningForKey) return;
@@ -49,6 +52,45 @@ export function PadEditor({ pad, onUpdate, onClose, onKeyChange }: PadEditorProp
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isListeningForKey, onKeyChange]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/wave', 'audio/x-wav'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Please upload an MP3 or WAV file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const audioData = reader.result as string;
+      setAudioFileName(file.name);
+      onUpdate({ audioData, audioFileName: file.name });
+      toast.success('Audio file uploaded');
+    };
+    reader.onerror = () => {
+      toast.error('Failed to read audio file');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveAudio = () => {
+    setAudioFileName('');
+    onUpdate({ audioData: undefined, audioFileName: undefined });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    toast.success('Audio file removed');
+  };
 
   const handleSave = () => {
     onUpdate({ name, key });
@@ -117,6 +159,40 @@ export function PadEditor({ pad, onUpdate, onClose, onKeyChange }: PadEditorProp
                 />
               ))}
             </div>
+          </div>
+
+          {/* Audio Upload */}
+          <div className="space-y-2">
+            <Label>Custom Audio</Label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".mp3,.wav,audio/mpeg,audio/wav"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            {audioFileName || pad.audioData ? (
+              <div className="flex items-center gap-2 p-3 glass rounded-xl">
+                <Music className="w-4 h-4 text-foreground/60" />
+                <span className="flex-1 text-sm truncate text-foreground/80">
+                  {audioFileName || 'Custom audio'}
+                </span>
+                <button
+                  onClick={handleRemoveAudio}
+                  className="p-1.5 rounded-full hover:bg-destructive/20 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4 text-destructive" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-12 glass-strong rounded-xl flex items-center justify-center gap-2 text-foreground/70 hover:text-foreground transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Upload MP3 or WAV</span>
+              </button>
+            )}
           </div>
 
           {/* Volume */}

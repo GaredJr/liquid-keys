@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { SoundPad as SoundPadType } from '@/hooks/useSoundboard';
-import { Settings2 } from 'lucide-react';
+import { Settings2, Music } from 'lucide-react';
 
 interface SoundPadProps {
   pad: SoundPadType;
@@ -36,7 +36,7 @@ const padGlowClasses: Record<number, string> = {
 
 export function SoundPad({ pad, isActive, onPlay, onEdit }: SoundPadProps) {
   const [ripple, setRipple] = useState<{ x: number; y: number } | null>(null);
-  const padRef = useRef<HTMLButtonElement>(null);
+  const padRef = useRef<HTMLDivElement>(null);
 
   const handleClick = (e: React.MouseEvent) => {
     const rect = padRef.current?.getBoundingClientRect();
@@ -51,7 +51,7 @@ export function SoundPad({ pad, isActive, onPlay, onEdit }: SoundPadProps) {
   };
 
   return (
-    <button
+    <div
       ref={padRef}
       onClick={handleClick}
       className={cn(
@@ -65,6 +65,14 @@ export function SoundPad({ pad, isActive, onPlay, onEdit }: SoundPadProps) {
         ],
         'animate-scale-in'
       )}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPlay();
+        }
+      }}
     >
       {/* Glow effect */}
       <div 
@@ -90,6 +98,13 @@ export function SoundPad({ pad, isActive, onPlay, onEdit }: SoundPadProps) {
         />
       )}
 
+      {/* Custom audio indicator */}
+      {pad.audioData && (
+        <div className="absolute top-2 left-2 p-1.5 rounded-full glass-strong">
+          <Music className="w-3 h-3 text-foreground/60" />
+        </div>
+      )}
+
       {/* Key indicator */}
       <span className="glass-strong text-xs font-semibold px-3 py-1 rounded-full text-foreground/80">
         {pad.key}
@@ -110,6 +125,6 @@ export function SoundPad({ pad, isActive, onPlay, onEdit }: SoundPadProps) {
       >
         <Settings2 className="w-3.5 h-3.5 text-foreground/60" />
       </button>
-    </button>
+    </div>
   );
 }
