@@ -1,11 +1,23 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { Soundboard } from '@/components/Soundboard';
+import glassBg from '@/assets/glass-bg.jpg';
 
 const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <div 
+      className="min-h-screen relative"
+      style={{
+        backgroundImage: `url(${glassBg})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+      }}
+    >
+      {/* Overlay for better contrast */}
+      <div className="absolute inset-0 bg-background/30 backdrop-blur-sm" />
+      
+      {/* Content */}
+      <div className="relative min-h-screen flex flex-col items-center justify-center p-6">
+        <Soundboard />
       </div>
     </div>
   );
