@@ -8,6 +8,8 @@ export interface SoundPad {
   audioData?: string; // Base64 encoded audio data
   audioFileName?: string;
   volume: number;
+  trimStart?: number; // Start time in seconds
+  trimEnd?: number;   // End time in seconds
 }
 
 const DEFAULT_PADS: SoundPad[] = [
@@ -150,20 +152,29 @@ export function useSoundboard() {
     }
   }, [getAudioContext]);
 
-  const playCustomAudio = useCallback(async (padId: string, audioData: string, volume: number) => {
+  const playCustomAudio = useCallback(async (pad: SoundPad) => {
+    if (!pad.audioData) return;
+    
     const audioContext = getAudioContext();
-    const buffer = await getAudioBuffer(padId, audioData);
+    const buffer = await getAudioBuffer(pad.id, pad.audioData);
     
     if (buffer) {
       const source = audioContext.createBufferSource();
       const gainNode = audioContext.createGain();
       
       source.buffer = buffer;
-      gainNode.gain.value = volume;
+      gainNode.gain.value = pad.volume;
       
       source.connect(gainNode);
       gainNode.connect(audioContext.destination);
-      source.start(0);
+      
+      // Apply trim settings
+      const startTime = pad.trimStart || 0;
+      const duration = pad.trimEnd 
+        ? pad.trimEnd - startTime 
+        : buffer.duration - startTime;
+      
+      source.start(0, startTime, duration);
     }
   }, [getAudioContext, getAudioBuffer]);
 
@@ -173,7 +184,7 @@ export function useSoundboard() {
 
     // Play custom audio if available
     if (pad.audioData) {
-      playCustomAudio(padId, pad.audioData, pad.volume);
+      playCustomAudio(pad);
     } else {
       const audioContext = getAudioContext();
       

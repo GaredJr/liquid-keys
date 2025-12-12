@@ -7,6 +7,7 @@ import { X, Upload, Trash2, Music } from 'lucide-react';
 import type { SoundPad } from '@/hooks/useSoundboard';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { AudioTrimmer } from './AudioTrimmer';
 
 interface PadEditorProps {
   pad: SoundPad;
@@ -172,18 +173,30 @@ export function PadEditor({ pad, onUpdate, onClose, onKeyChange }: PadEditorProp
               className="hidden"
             />
             {audioFileName || pad.audioData ? (
-              <div className="flex items-center gap-2 p-3 glass rounded-xl">
-                <Music className="w-4 h-4 text-foreground/60" />
-                <span className="flex-1 text-sm truncate text-foreground/80">
-                  {audioFileName || 'Custom audio'}
-                </span>
-                <button
-                  onClick={handleRemoveAudio}
-                  className="p-1.5 rounded-full hover:bg-destructive/20 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4 text-destructive" />
-                </button>
-              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 p-3 glass rounded-xl">
+                  <Music className="w-4 h-4 text-foreground/60" />
+                  <span className="flex-1 text-sm truncate text-foreground/80">
+                    {audioFileName || 'Custom audio'}
+                  </span>
+                  <button
+                    onClick={handleRemoveAudio}
+                    className="p-1.5 rounded-full hover:bg-destructive/20 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </button>
+                </div>
+                
+                {/* Audio Trimmer */}
+                {pad.audioData && (
+                  <AudioTrimmer
+                    audioData={pad.audioData}
+                    trimStart={pad.trimStart || 0}
+                    trimEnd={pad.trimEnd || 0}
+                    onTrimChange={(start, end) => onUpdate({ trimStart: start, trimEnd: end })}
+                  />
+                )}
+          </div>
             ) : (
               <button
                 onClick={() => fileInputRef.current?.click()}
