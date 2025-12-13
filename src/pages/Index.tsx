@@ -29,7 +29,7 @@ const Index = () => {
             Web Audio API Powered
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-foreground via-foreground/80 to-foreground bg-clip-text mb-3">
-            Glass Soundboard
+            SoundEZ
           </h1>
           <p className="text-muted-foreground max-w-md mx-auto">
             A minimal, beautiful soundboard with glass morphism design. 
