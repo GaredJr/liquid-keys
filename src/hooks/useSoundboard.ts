@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 
 export interface SoundPad {
   id: string;
@@ -236,7 +237,27 @@ export function useSoundboard() {
     
     setPads(prev => {
       const newPads = prev.map(p => p.id === padId ? { ...p, ...updates } : p);
-      localStorage.setItem('soundboard-pads', JSON.stringify(newPads));
+      
+      // Safe localStorage save with quota handling
+      try {
+        const dataToStore = JSON.stringify(newPads);
+        localStorage.setItem('soundboard-pads', dataToStore);
+      } catch (error) {
+        // Handle quota exceeded or other storage errors
+        if (error instanceof DOMException && (
+          error.name === 'QuotaExceededError' || 
+          error.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+        )) {
+          toast.error('Storage limit reached. Remove some audio files to add more.');
+          // Revert the audio update if it caused the quota issue
+          if ('audioData' in updates && updates.audioData) {
+            return prev; // Don't update state if we can't persist
+          }
+        } else {
+          console.error('Failed to save to localStorage:', error);
+        }
+      }
+      
       return newPads;
     });
   }, []);

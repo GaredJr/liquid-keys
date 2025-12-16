@@ -54,11 +54,28 @@ export function PadEditor({ pad, onUpdate, onClose, onKeyChange }: PadEditorProp
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isListeningForKey, onKeyChange]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Validate audio file magic numbers (file signatures)
+  const validateAudioSignature = (bytes: Uint8Array): boolean => {
+    // MP3: starts with ID3 (ID3v2) or 0xFF 0xFB/0xFA/0xF3/0xF2 (MP3 frame sync)
+    const isMP3 = (
+      (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) || // ID3
+      (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0) // Frame sync
+    );
+    
+    // WAV: starts with RIFF....WAVE
+    const isWAV = (
+      bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && // RIFF
+      bytes[8] === 0x57 && bytes[9] === 0x41 && bytes[10] === 0x56 && bytes[11] === 0x45 // WAVE
+    );
+    
+    return isMP3 || isWAV;
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
+    // Validate file type (MIME type check)
     const validTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/wave', 'audio/x-wav'];
     if (!validTypes.includes(file.type)) {
       toast.error('Please upload an MP3 or WAV file');
@@ -71,12 +88,42 @@ export function PadEditor({ pad, onUpdate, onClose, onKeyChange }: PadEditorProp
       return;
     }
 
+    // Validate magic numbers (file signature)
+    try {
+      const headerBuffer = await file.slice(0, 12).arrayBuffer();
+      const headerBytes = new Uint8Array(headerBuffer);
+      
+      if (!validateAudioSignature(headerBytes)) {
+        toast.error('Invalid audio file format');
+        return;
+      }
+    } catch {
+      toast.error('Failed to validate audio file');
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const audioData = reader.result as string;
-      setAudioFileName(file.name);
-      onUpdate({ audioData, audioFileName: file.name });
-      toast.success('Audio file uploaded');
+      
+      // Validate with Web Audio API decodeAudioData
+      try {
+        const audioContext = new AudioContext();
+        const base64Data = audioData.split(',')[1] || audioData;
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        await audioContext.decodeAudioData(bytes.buffer.slice(0));
+        audioContext.close();
+        
+        setAudioFileName(file.name);
+        onUpdate({ audioData, audioFileName: file.name });
+        toast.success('Audio file uploaded');
+      } catch {
+        toast.error('Invalid or corrupted audio file');
+      }
     };
     reader.onerror = () => {
       toast.error('Failed to read audio file');
